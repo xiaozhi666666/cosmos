@@ -67,7 +67,12 @@ const BlockExplorer: React.FC = () => {
       }
       setRecentBlocks(blocks);
     } catch (err) {
-      setError('Failed to load latest block: ' + (err as Error).message);
+      console.error('获取最新区块失败:', err);
+      setError('网络连接失败，正在尝试其他节点...');
+      // 稍后重试
+      setTimeout(() => {
+        loadLatestBlock();
+      }, 3000);
     } finally {
       setLoading(false);
     }

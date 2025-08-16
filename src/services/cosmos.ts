@@ -36,18 +36,37 @@ export class CosmosService {
   private signingClient: SigningStargateClient | null = null;
   private wallet: DirectSecp256k1HdWallet | null = null;
   private rpcEndpoint: string;
+  private backupEndpoints: string[] = [
+    'https://cosmos-rpc.polkachu.com',
+    'https://rpc.cosmos.network:443',
+    'https://cosmos-rpc.publicnode.com:443',
+    'https://rpc-cosmoshub.blockapsis.com',
+    'https://cosmos-rpc.staketab.org:443'
+  ];
 
-  constructor(rpcEndpoint: string = 'https://rpc.cosmos.network:443') {
-    this.rpcEndpoint = rpcEndpoint;
+  constructor(rpcEndpoint?: string) {
+    this.rpcEndpoint = rpcEndpoint || this.backupEndpoints[0];
   }
 
   async connect(): Promise<void> {
-    try {
-      this.client = await StargateClient.connect(this.rpcEndpoint);
-    } catch (error) {
-      console.error('Failed to connect to Cosmos network:', error);
-      throw error;
+    let lastError: any = null;
+    
+    for (const endpoint of this.backupEndpoints) {
+      try {
+        console.log(`尝试连接到: ${endpoint}`);
+        this.client = await StargateClient.connect(endpoint);
+        this.rpcEndpoint = endpoint;
+        console.log(`成功连接到: ${endpoint}`);
+        return;
+      } catch (error) {
+        console.warn(`连接失败 ${endpoint}:`, error);
+        lastError = error;
+        continue;
+      }
     }
+    
+    console.error('所有 RPC 端点连接失败');
+    throw lastError || new Error('所有 RPC 端点都无法连接');
   }
 
   async createWallet(): Promise<WalletInfo> {
@@ -207,11 +226,16 @@ export class CosmosService {
 
   async getValidators(): Promise<any[]> {
     try {
+      // 确保先连接到可用的RPC端点
+      if (!this.client) {
+        await this.connect();
+      }
+      
       const tmClient = await Tendermint34Client.connect(this.rpcEndpoint);
       const validators = await tmClient.validatorsAll();
       return [...validators.validators];
     } catch (error) {
-      console.error('Failed to get validators:', error);
+      console.error('获取验证者失败:', error);
       throw error;
     }
   }
