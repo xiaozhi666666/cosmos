@@ -1,3 +1,17 @@
+/**
+ * 钱包管理组件
+ * 
+ * 这个组件提供完整的钱包管理功能，包括：
+ * - 创建新钱包（生成助记词）
+ * - 导入现有钱包（通过助记词）
+ * - 显示钱包列表和余额
+ * - 钱包选择功能
+ * - 助记词显示/隐藏切换
+ * - 本地存储钱包数据
+ * 
+ * 所有钱包数据都存储在localStorage中，刷新页面后仍然保留
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -17,9 +31,12 @@ import { AccountBalanceWallet, Add, Visibility, VisibilityOff } from '@mui/icons
 import { cosmosService } from '../services/cosmos';
 import { Wallet } from '../types';
 
+/**
+ * 钱包管理组件的属性接口
+ */
 interface WalletManagerProps {
-  onWalletSelect: (wallet: Wallet) => void;
-  selectedWallet: Wallet | null;
+  onWalletSelect: (wallet: Wallet) => void;  // 钱包选择回调函数
+  selectedWallet: Wallet | null;             // 当前选中的钱包
 }
 
 const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedWallet }) => {

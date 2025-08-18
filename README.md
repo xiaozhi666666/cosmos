@@ -1,46 +1,187 @@
-# Getting Started with Create React App
+# Cosmos 本地区块链模拟应用
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+这是一个完整的 Cosmos 区块链模拟应用，使用 React + TypeScript 构建，提供了完整的区块链功能演示，无需连接真实的区块链网络。
 
-## Available Scripts
+## 🚀 主要功能
 
-In the project directory, you can run:
+### 1. 钱包管理 💼
+- **创建新钱包**：生成24个单词的助记词和对应的钱包地址
+- **导入钱包**：通过助记词恢复现有钱包
+- **钱包列表**：显示所有钱包和余额信息
+- **助记词管理**：安全显示/隐藏助记词
 
-### `npm start`
+### 2. 代币生产 🪙
+- **自定义代币铸造**：创建自己的代币（名称、符号、数量）
+- **预定义模板**：快速选择常用代币模板
+- **铸造历史**：查看所有铸造记录
+- **表单验证**：确保输入数据的有效性
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 3. 代币转账 💸
+- **发送代币**：在钱包间转移代币
+- **多代币支持**：支持不同类型的代币转账
+- **地址验证**：确保接收地址格式正确
+- **转账历史**：记录所有转账操作
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### 4. 挖矿模拟 ⛏️
+- **验证者选择**：选择不同的验证者进行挖矿
+- **实时进度**：显示挖矿进度条
+- **奖励计算**：模拟真实的挖矿奖励
+- **统计信息**：累计奖励和平均收益
 
-### `npm test`
+### 5. 区块浏览器 🔍
+- **最新区块**：实时显示最新生成的区块
+- **区块历史**：浏览完整的区块链历史
+- **区块详情**：查看区块的详细信息
+- **交易统计**：区块中的交易数量统计
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 🛠️ 技术架构
 
-### `npm run build`
+### 前端框架
+- **React 18**：现代化的用户界面框架
+- **TypeScript**：提供类型安全和更好的开发体验
+- **Material-UI v5**：Google Material Design风格的UI组件库
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 区块链集成
+- **@cosmjs**：Cosmos SDK的JavaScript/TypeScript客户端库
+- **模拟区块链**：本地实现的完整区块链模拟系统
+- **HD钱包**：支持分层确定性钱包（BIP44标准）
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 状态管理
+- **React Hooks**：使用useState和useEffect管理组件状态
+- **LocalStorage**：持久化钱包和交易数据
+- **全局状态**：通过Props在组件间共享钱包信息
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 📁 项目结构
 
-### `npm run eject`
+```
+src/
+├── components/           # React组件
+│   ├── WalletManager.tsx    # 钱包管理组件
+│   ├── TokenMint.tsx        # 代币铸造组件
+│   ├── TokenTransfer.tsx    # 代币转账组件
+│   ├── Mining.tsx           # 挖矿组件
+│   └── BlockExplorer.tsx    # 区块浏览器组件
+├── services/            # 服务层
+│   ├── cosmos.ts           # Cosmos区块链服务
+│   └── mockBlockchain.ts   # 模拟区块链实现
+├── types/               # TypeScript类型定义
+│   └── index.ts            # 所有接口和类型
+├── App.tsx              # 主应用组件
+└── index.tsx            # 应用入口点
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## 🚀 快速开始
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 环境要求
+- Node.js 16+ 
+- npm 或 yarn
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### 安装依赖
+```bash
+npm install
+```
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### 启动开发服务器
+```bash
+npm start
+```
 
-## Learn More
+应用将在 http://localhost:3000 启动
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 构建生产版本
+```bash
+npm run build
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### 运行测试
+```bash
+npm test
+```
+
+## 💡 使用指南
+
+### 1. 创建第一个钱包
+1. 点击"钱包管理"标签
+2. 点击"创建新钱包"按钮
+3. 安全保存显示的助记词
+4. 钱包创建完成，可以看到地址和初始余额
+
+### 2. 铸造自定义代币
+1. 选择"代币生产"标签
+2. 填写代币名称、符号和数量
+3. 或选择预定义模板快速填写
+4. 点击"铸造代币"完成创建
+
+### 3. 进行代币转账
+1. 确保已选择发送方钱包
+2. 在"代币转账"标签页填写接收地址和金额
+3. 选择要转账的代币类型
+4. 确认转账信息后提交
+
+### 4. 模拟挖矿
+1. 在"挖矿"标签页选择验证者
+2. 点击"开始挖矿"
+3. 观看挖矿进度和奖励
+4. 查看挖矿历史和统计
+
+### 5. 浏览区块链
+1. "区块浏览器"标签显示最新区块
+2. 可以查看历史区块信息
+3. 观察区块生成的实时过程
+
+## 🔧 开发说明
+
+### 模拟区块链
+应用使用了完全本地化的区块链模拟系统：
+- 自动生成区块和交易
+- 模拟验证者网络
+- 实现完整的账户余额系统
+- 支持挖矿奖励机制
+
+### 数据持久化
+- 钱包数据存储在 localStorage
+- 交易历史和铸造记录本地保存
+- 页面刷新后数据仍然保留
+
+### 安全考虑
+- 助记词仅在本地显示，不会发送到服务器
+- 私钥在内存中生成和使用
+- 所有操作都在客户端完成
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request 来改进项目！
+
+### 开发流程
+1. Fork 项目
+2. 创建功能分支
+3. 提交更改
+4. 发起 Pull Request
+
+## 📄 许可证
+
+MIT License
+
+## 🎯 未来计划
+
+- [ ] 添加更多代币标准支持
+- [ ] 实现智能合约功能
+- [ ] 添加网络连接功能
+- [ ] 移动端适配
+- [ ] 多语言支持
+
+## 📞 联系方式
+
+如有问题或建议，请通过 Issue 联系我们。
+
+---
+
+**注意**：这是一个演示项目，仅用于学习和测试目的。请勿在生产环境中使用。
+
+## Create React App 相关
+
+此项目使用 [Create React App](https://github.com/facebook/create-react-app) 创建。
+
+如需了解更多关于 Create React App 的信息，请查看 [Create React App 文档](https://facebook.github.io/create-react-app/docs/getting-started)。
+
+要学习 React，请查看 [React 文档](https://reactjs.org/)。

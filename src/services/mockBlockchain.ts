@@ -1,23 +1,44 @@
-// 本地模拟区块链服务
+/**
+ * 模拟区块链服务
+ * 
+ * 这个文件实现了一个完整的模拟区块链系统，用于离线演示和测试
+ * 主要功能包括：
+ * - 模拟区块生成和管理
+ * - 模拟交易处理
+ * - 验证者管理
+ * - 账户余额管理
+ * - 挖矿奖励模拟
+ * 
+ * 这个模拟系统可以在没有网络连接的情况下提供完整的区块链体验
+ */
+
+/**
+ * 模拟区块接口
+ * 定义区块链中每个区块的数据结构
+ */
 export interface MockBlock {
-  height: number;
-  hash: string;
-  timestamp: string;
-  transactions: MockTransaction[];
-  validator: string;
-  difficulty: number;
+  height: number;                    // 区块高度（区块号）
+  hash: string;                      // 区块哈希值
+  timestamp: string;                 // 区块创建时间戳
+  transactions: MockTransaction[];   // 区块中包含的交易列表
+  validator: string;                 // 产生此区块的验证者
+  difficulty: number;                // 挖矿难度
 }
 
+/**
+ * 模拟交易接口
+ * 定义区块链中每笔交易的数据结构
+ */
 export interface MockTransaction {
-  hash: string;
-  from: string;
-  to: string;
-  amount: string;
-  denom: string;
-  fee: string;
-  timestamp: string;
-  status: 'success' | 'failed';
-  blockHeight: number;
+  hash: string;                      // 交易哈希值
+  from: string;                      // 发送方地址
+  to: string;                        // 接收方地址
+  amount: string;                    // 转账金额
+  denom: string;                     // 代币类型
+  fee: string;                       // 交易手续费
+  timestamp: string;                 // 交易时间戳
+  status: 'success' | 'failed';     // 交易状态
+  blockHeight: number;               // 交易所在区块高度
 }
 
 export interface MockValidator {

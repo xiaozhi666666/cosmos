@@ -1,41 +1,84 @@
+/**
+ * Cosmos 区块链服务类
+ * 
+ * 提供与Cosmos区块链交互的核心功能，包括：
+ * - 钱包创建和导入
+ * - 代币转账
+ * - 余额查询
+ * - 区块和验证者信息获取
+ * - 挖矿模拟
+ * 
+ * 本服务支持两种模式：
+ * 1. 本地模拟模式：使用mockBlockchain进行离线模拟
+ * 2. 网络模式：连接真实的Cosmos网络（当前已禁用）
+ */
+
 import { StargateClient, SigningStargateClient } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { GasPrice } from '@cosmjs/stargate';
 
+/**
+ * 钱包信息接口
+ * 用于钱包创建和导入操作的返回值
+ */
 export interface WalletInfo {
-  address: string;
-  mnemonic: string;
-  publicKey: Uint8Array;
+  address: string;        // 钱包地址
+  mnemonic: string;       // 助记词
+  publicKey: Uint8Array;  // 公钥
 }
 
+/**
+ * 代币信息接口
+ * 用于余额查询的返回值
+ */
 export interface TokenInfo {
-  denom: string;
-  amount: string;
+  denom: string;   // 代币名称
+  amount: string;  // 代币数量
 }
 
+/**
+ * 区块信息接口
+ * 用于区块查询的返回值
+ */
 export interface BlockInfo {
-  height: number;
-  hash: string;
-  time: string;
-  txCount: number;
+  height: number;  // 区块高度
+  hash: string;    // 区块哈希
+  time: string;    // 创建时间
+  txCount: number; // 交易数量
 }
 
+/**
+ * 交易信息接口
+ * 用于交易相关操作的数据结构
+ */
 export interface TransactionInfo {
-  hash: string;
-  height: number;
-  from: string;
-  to: string;
-  amount: string;
-  fee: string;
-  status: string;
+  hash: string;    // 交易哈希
+  height: number;  // 区块高度
+  from: string;    // 发送方
+  to: string;      // 接收方
+  amount: string;  // 金额
+  fee: string;     // 手续费
+  status: string;  // 状态
 }
 
+/**
+ * Cosmos服务主类
+ * 管理与区块链的所有交互操作
+ */
 export class CosmosService {
+  // 只读客户端，用于查询操作
   private client: StargateClient | null = null;
+  // 签名客户端，用于发送交易
   private signingClient: SigningStargateClient | null = null;
+  // HD钱包实例
   private wallet: DirectSecp256k1HdWallet | null = null;
-  private useLocalChain: boolean = true; // 使用本地模拟链
+  // 是否使用本地模拟链（默认为true）
+  private useLocalChain: boolean = true;
 
+  /**
+   * 构造函数
+   * 初始化服务并启动本地模拟区块链
+   */
   constructor() {
     // 启动本地区块链
     if (this.useLocalChain) {
@@ -47,6 +90,10 @@ export class CosmosService {
     }
   }
 
+  /**
+   * 连接到区块链网络
+   * 在本地模式下此方法不执行实际连接
+   */
   async connect(): Promise<void> {
     if (this.useLocalChain) {
       console.log('使用本地模拟区块链，无需连接外部网络');
@@ -57,17 +104,27 @@ export class CosmosService {
     console.log('本地模拟模式已启用，跳过网络连接');
   }
 
+  /**
+   * 创建新钱包
+   * 生成随机的24个单词助记词和对应的钱包地址
+   * 
+   * @returns Promise<WalletInfo> 钱包信息，包含地址、助记词和公钥
+   * @throws Error 当钱包创建失败时抛出异常
+   */
   async createWallet(): Promise<WalletInfo> {
     try {
+      // 生成包含24个助记词的HD钱包
       const wallet = await DirectSecp256k1HdWallet.generate(24);
       const accounts = await wallet.getAccounts();
       
+      // 验证账户是否成功创建
       if (!accounts || accounts.length === 0) {
         throw new Error('Failed to generate wallet accounts');
       }
       
       const [account] = accounts;
       
+      // 验证账户地址是否有效
       if (!account || !account.address) {
         throw new Error('Failed to get wallet address from account');
       }
@@ -83,21 +140,33 @@ export class CosmosService {
     }
   }
 
+  /**
+   * 导入现有钱包
+   * 使用助记词恢复钱包
+   * 
+   * @param mnemonic - 12或24个单词的助记词字符串
+   * @returns Promise<WalletInfo> 导入的钱包信息
+   * @throws Error 当助记词无效或导入失败时抛出异常
+   */
   async importWallet(mnemonic: string): Promise<WalletInfo> {
     try {
+      // 从助记词创建HD钱包
       const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);
       const accounts = await wallet.getAccounts();
       
+      // 验证账户是否成功导入
       if (!accounts || accounts.length === 0) {
         throw new Error('Failed to import wallet accounts');
       }
       
       const [account] = accounts;
       
+      // 验证账户地址是否有效
       if (!account || !account.address) {
         throw new Error('Failed to get wallet address from imported account');
       }
       
+      // 保存钱包实例供后续使用
       this.wallet = wallet;
       
       return {

@@ -1,6 +1,9 @@
 {
+  "_comment": "Cosmos 本地区块链模拟应用 - 一个完整的区块链演示项目，包括钱包管理、代币铸造、转账、挖矿和区块浏览功能",
   "name": "cosmos",
   "version": "0.1.0",
+  "description": "本地区块链模拟应用，提供完整的Cosmos生态功能演示",
+  "keywords": ["blockchain", "cosmos", "react", "typescript", "wallet", "mining"],
   "private": true,
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.36.0",
