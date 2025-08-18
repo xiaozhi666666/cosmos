@@ -13,17 +13,26 @@ import { StargateClient, SigningStargateClient, GasPrice } from '@cosmjs/stargat
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { Coin } from '@cosmjs/amino';
 
-// 网络配置
+// 网络配置 - 多个备用RPC节点
 const NETWORKS = {
   mainnet: {
-    rpc: 'https://rpc-cosmoshub.blockapsis.com',
+    rpc: [
+      'https://cosmos-rpc.polkachu.com',
+      'https://rpc-cosmoshub.blockapsis.com', 
+      'https://cosmos-rpc.quickapi.com',
+      'https://cosmos.api.onfinality.io/public'
+    ],
     chainId: 'cosmoshub-4',
     denom: 'uatom',
     prefix: 'cosmos',
     gasPrice: GasPrice.fromString('0.025uatom')
   },
   testnet: {
-    rpc: 'https://rpc.sentry-01.theta-testnet.polypore.xyz',
+    rpc: [
+      'https://cosmos-testnet-rpc.polkachu.com',
+      'https://rpc.sentry-01.theta-testnet.polypore.xyz',
+      'https://cosmos-testnet.api.onfinality.io/public'
+    ],
     chainId: 'theta-testnet-001', 
     denom: 'uatom',
     prefix: 'cosmos',
@@ -87,6 +96,7 @@ export class CosmosService {
   private client: StargateClient | null = null;
   private signingClient: SigningStargateClient | null = null;
   private network = NETWORKS.testnet; // 默认使用测试网
+  private currentRpcUrl: string = ''; // 当前成功连接的RPC URL
 
   constructor(useMainnet: boolean = false) {
     this.network = useMainnet ? NETWORKS.mainnet : NETWORKS.testnet;
@@ -94,17 +104,59 @@ export class CosmosService {
   }
 
   /**
-   * 连接到Cosmos网络
+   * 获取当前使用的RPC URL
+   */
+  private getCurrentRpcUrl(): string {
+    if (this.currentRpcUrl) {
+      return this.currentRpcUrl;
+    }
+    // 如果没有记录当前RPC，返回第一个可用的
+    const rpcEndpoints = Array.isArray(this.network.rpc) ? this.network.rpc : [this.network.rpc];
+    return rpcEndpoints[0];
+  }
+
+  /**
+   * 连接到Cosmos网络 - 支持多RPC节点和重试
    */
   async connect(): Promise<void> {
-    try {
-      this.client = await StargateClient.connect(this.network.rpc);
-      const chainId = await this.client.getChainId();
-      console.log(`已成功连接到 ${chainId}`);
-    } catch (error) {
-      console.error('连接Cosmos网络失败:', error);
-      throw error;
+    const rpcEndpoints = Array.isArray(this.network.rpc) ? this.network.rpc : [this.network.rpc];
+    let lastError: any;
+    
+    console.log(`尝试连接到 ${this.network.chainId}，共有 ${rpcEndpoints.length} 个RPC节点可用`);
+    
+    for (let i = 0; i < rpcEndpoints.length; i++) {
+      const rpcUrl = rpcEndpoints[i];
+      try {
+        console.log(`尝试连接RPC节点 ${i + 1}/${rpcEndpoints.length}: ${rpcUrl}`);
+        
+        // 添加超时控制
+        const connectPromise = StargateClient.connect(rpcUrl);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('连接超时')), 10000)
+        );
+        
+        this.client = await Promise.race([connectPromise, timeoutPromise]) as StargateClient;
+        
+        const chainId = await this.client.getChainId();
+        this.currentRpcUrl = rpcUrl; // 记录成功的RPC URL
+        console.log(`✅ 成功连接到 ${chainId} (使用RPC: ${rpcUrl})`);
+        return;
+        
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`❌ RPC节点 ${rpcUrl} 连接失败:`, error.message);
+        
+        // 如果不是最后一个节点，继续尝试下一个
+        if (i < rpcEndpoints.length - 1) {
+          console.log(`尝试下一个RPC节点...`);
+          continue;
+        }
+      }
     }
+    
+    // 所有RPC节点都失败了
+    console.error('❌ 所有RPC节点连接失败');
+    throw new Error(`连接Cosmos网络失败，已尝试 ${rpcEndpoints.length} 个RPC节点。最后错误: ${lastError?.message || '未知错误'}`);
   }
 
   /**
@@ -162,8 +214,10 @@ export class CosmosService {
         prefix: this.network.prefix
       });
 
+      // 创建签名客户端 - 使用已连接的RPC端点
+      const rpcUrl = this.getCurrentRpcUrl();
       this.signingClient = await SigningStargateClient.connectWithSigner(
-        this.network.rpc,
+        rpcUrl,
         wallet,
         {
           gasPrice: this.network.gasPrice
