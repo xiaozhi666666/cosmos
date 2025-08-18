@@ -15,7 +15,6 @@
 
 import { StargateClient, SigningStargateClient } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
-import { GasPrice } from '@cosmjs/stargate';
 
 /**
  * 钱包信息接口
@@ -199,6 +198,7 @@ export class CosmosService {
     }
   }
 
+  // 获取余额
   async getBalance(address: string): Promise<TokenInfo[]> {
     try {
       if (this.useLocalChain) {
@@ -226,11 +226,11 @@ export class CosmosService {
   }
 
   async sendTokens(
-    mnemonic: string,
-    fromAddress: string,
-    toAddress: string,
-    amount: string,
-    denom: string = 'stake'
+    mnemonic: string, // 助记词
+    fromAddress: string, // 发送方地址
+    toAddress: string, // 接收方地址
+    amount: string, // 转账金额
+    denom: string = 'stake' // 代币名称
   ): Promise<string> {
     try {
       if (this.useLocalChain) {
@@ -301,6 +301,7 @@ export class CosmosService {
     }
   }
 
+  // 获取指定高度的区块
   async getBlockByHeight(height: number): Promise<BlockInfo> {
     try {
       if (this.useLocalChain) {
@@ -335,6 +336,7 @@ export class CosmosService {
     }
   }
 
+  // 获取链ID
   async getChainId(): Promise<string> {
     try {
       if (this.useLocalChain) {
@@ -368,6 +370,7 @@ export class CosmosService {
     }
   }
 
+  // 模拟挖矿
   async simulateMining(validatorAddress: string): Promise<string> {
     return new Promise((resolve) => {
       setTimeout(async () => {
