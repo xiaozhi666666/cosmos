@@ -1,13 +1,11 @@
 /**
- * 代币转账组件
+ * 代币转账组件 - RPC版本
  * 
- * 这个组件提供代币转账功能，包括：
- * - 发送代币到指定地址
- * - 代币类型选择（支持多种代币）
- * - 转账金额验证
- * - 地址格式验证  
- * - 转账历史记录
- * - 转账状态显示和错误处理
+ * 这个组件提供真实的Cosmos网络代币转账功能，不使用本地缓存：
+ * - 执行真实的代币转账交易到Cosmos网络
+ * - 支持多种代币类型（ATOM等）
+ * - 实时余额验证和地址格式验证
+ * - 所有交易数据都来自真实的区块链网络
  * 
  * 需要用户先选择钱包才能使用转账功能
  */
@@ -44,53 +42,6 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const updateTransferBalances = (fromAddress: string, toAddress: string, amount: string, denom: string) => {
-    try {
-      const stored = localStorage.getItem('cosmos-wallets');
-      if (stored) {
-        const wallets = JSON.parse(stored);
-        const updatedWallets = wallets.map((w: Wallet) => {
-          if (w.address === fromAddress) {
-            // 扣除发送方余额
-            const updatedBalance = w.balance.map(token => {
-              if (token.denom === denom) {
-                const currentAmount = parseFloat(token.amount);
-                const transferAmount = parseFloat(amount);
-                return {
-                  ...token,
-                  amount: (currentAmount - transferAmount).toString()
-                };
-              }
-              return token;
-            });
-            return { ...w, balance: updatedBalance };
-          } else if (w.address === toAddress) {
-            // 增加接收方余额
-            const updatedBalance = [...w.balance];
-            const tokenIndex = updatedBalance.findIndex(token => token.denom === denom);
-            
-            if (tokenIndex >= 0) {
-              // 更新现有代币余额
-              const currentAmount = parseFloat(updatedBalance[tokenIndex].amount);
-              const transferAmount = parseFloat(amount);
-              updatedBalance[tokenIndex].amount = (currentAmount + transferAmount).toString();
-            } else {
-              // 添加新的代币类型
-              updatedBalance.push({ denom, amount });
-            }
-            
-            return { ...w, balance: updatedBalance };
-          }
-          return w;
-        });
-        
-        localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
-        console.log(`转账余额已更新: ${fromAddress} -> ${toAddress}, ${(parseFloat(amount) / 1000000).toFixed(6)} ${denom.replace('u', '').toUpperCase()}`);
-      }
-    } catch (error) {
-      console.error('更新转账余额失败:', error);
-    }
-  };
 
   const handleTransfer = async () => {
     if (!wallet) {
@@ -130,13 +81,17 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
         selectedDenom
       );
 
-      // 更新发送方和接收方余额
-      updateTransferBalances(wallet.address, toAddress, amountInMicroUnits, selectedDenom);
-
-      setSuccess(`转账成功！交易哈希: ${txHash}`);
+      // 记录转账成功（仅用于显示）
+      console.log(`转账成功: ${amount} ${selectedDenom.replace('u', '').toUpperCase()} 从 ${wallet.address} 到 ${toAddress}, 交易哈希: ${txHash}`);
+      
+      setSuccess(`转账已提交到Cosmos网络！交易哈希: ${txHash.slice(0, 16)}... 等待区块确认...`);
       setToAddress('');
       setAmount('');
-      onTransferComplete();
+      
+      // 通知父组件更新余额（从RPC获取最新余额）
+      setTimeout(() => {
+        onTransferComplete();
+      }, 1000); // 给一点时间显示成功消息
     } catch (err) {
       setError('转账失败: ' + (err as Error).message);
     } finally {
@@ -168,7 +123,7 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          从钱包: {wallet?.address?.slice(0, 20)}...
+          从钱包: {wallet?.address?.slice(0, 20)}... (连接到真实的Cosmos网络)
         </Typography>
 
         {error && (

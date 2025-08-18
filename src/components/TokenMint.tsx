@@ -1,14 +1,12 @@
 /**
- * 代币铸造组件
+ * 代币水龙头组件 - RPC版本
  * 
- * 这个组件允许用户铸造自定义代币，功能包括：
- * - 创建新的代币（指定名称、符号、数量）
- * - 预定义代币模板快速选择
- * - 铸造历史记录查看
- * - 表单验证和错误处理
- * - 铸造进度显示
+ * 这个组件提供真实的Cosmos测试网代币申请说明，不使用本地缓存：
+ * - 显示测试网代币信息
+ * - 提供官方水龙头链接
+ * - 实时从RPC获取余额信息
  * 
- * 所有铸造记录都保存在localStorage中，方便用户查看历史
+ * 在真实的Cosmos网络中，代币需要从官方水龙头或其他用户获取
  */
 
 import React, { useState } from 'react';
@@ -16,122 +14,75 @@ import {
   Card,
   CardContent,
   Typography,
-  TextField,
   Button,
   Box,
   Alert,
   CircularProgress,
-  Paper
+  Chip
 } from '@mui/material';
-import { AccountBalance, Add } from '@mui/icons-material';
+import { Water, OpenInNew, Refresh } from '@mui/icons-material';
 import { Wallet } from '../types';
+import { cosmosService } from '../services/cosmos';
 
-interface TokenMintProps {
+interface TokenFaucetProps {
   wallet: Wallet | null;
-  onMintComplete: () => void;
+  onBalanceUpdate: () => void;
+  onMintComplete?: () => void;
 }
 
-interface MintedToken {
+interface FaucetInfo {
+  denom: string;
   name: string;
-  symbol: string;
-  amount: string;
-  timestamp: string;
-  txHash: string;
+  description: string;
+  officialFaucet: string;
+  testAmount: string;
 }
 
-const TokenMint: React.FC<TokenMintProps> = ({ wallet, onMintComplete }) => {
-  const [tokenName, setTokenName] = useState('');
-  const [tokenSymbol, setTokenSymbol] = useState('');
-  const [mintAmount, setMintAmount] = useState('');
+const TokenFaucet: React.FC<TokenFaucetProps> = ({ wallet, onBalanceUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [mintedTokens, setMintedTokens] = useState<MintedToken[]>([]);
+  const [balance, setBalance] = useState<any[]>([]);
 
-  React.useEffect(() => {
-    loadMintHistory();
-  }, []);
-
-  const loadMintHistory = () => {
-    const stored = localStorage.getItem('minted-tokens');
-    if (stored) {
-      setMintedTokens(JSON.parse(stored));
+  // 真实的Cosmos测试网信息
+  const faucetInfo: FaucetInfo[] = [
+    {
+      denom: 'uatom',
+      name: 'ATOM',
+      description: 'Cosmos Hub 主网代币',
+      officialFaucet: 'https://faucet.cosmos.network/',
+      testAmount: '需要从官方水龙头获取'
+    },
+    {
+      denom: 'uosmo',
+      name: 'OSMO', 
+      description: 'Osmosis 测试网代币',
+      officialFaucet: 'https://faucet.osmosis.zone/',
+      testAmount: '需要从Osmosis水龙头获取'
     }
-  };
+  ];
 
-  const saveMintHistory = (tokens: MintedToken[]) => {
-    localStorage.setItem('minted-tokens', JSON.stringify(tokens));
-    setMintedTokens(tokens);
-  };
-
-  const generateTxHash = () => {
-    return Array.from({ length: 64 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('').toUpperCase();
-  };
-
-  const handleMint = async () => {
+  const refreshBalance = async () => {
     if (!wallet) {
       setError('请先选择钱包');
       return;
     }
 
-    if (!tokenName || !tokenSymbol || !mintAmount) {
-      setError('请填写所有字段');
-      return;
-    }
-
-    if (parseFloat(mintAmount) <= 0) {
-      setError('铸造数量必须大于0');
-      return;
-    }
-
-    if (tokenSymbol.length < 2 || tokenSymbol.length > 10) {
-      setError('代币符号长度应在2-10字符之间');
-      return;
-    }
-
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
     try {
-      // 模拟代币铸造过程
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const newToken: MintedToken = {
-        name: tokenName,
-        symbol: tokenSymbol.toUpperCase(),
-        amount: mintAmount,
-        timestamp: new Date().toISOString(),
-        txHash: generateTxHash()
-      };
-
-      const updatedTokens = [newToken, ...mintedTokens].slice(0, 50); // 保留最近50条记录
-      saveMintHistory(updatedTokens);
-
-      setSuccess(`成功铸造 ${mintAmount} ${tokenSymbol.toUpperCase()} 代币！`);
-      setTokenName('');
-      setTokenSymbol('');
-      setMintAmount('');
-      onMintComplete();
+      const balanceData = await cosmosService.getBalance(wallet.address);
+      setBalance(balanceData);
+      onBalanceUpdate(); // 通知父组件更新
     } catch (err) {
-      setError('代币铸造失败: ' + (err as Error).message);
+      setError('获取余额失败: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  const predefinedTokens = [
-    { name: 'Custom Token A', symbol: 'CTA' },
-    { name: 'Custom Token B', symbol: 'CTB' },
-    { name: 'Test Token', symbol: 'TEST' },
-    { name: 'Demo Coin', symbol: 'DEMO' }
-  ];
-
-  const selectPredefinedToken = (token: { name: string; symbol: string }) => {
-    setTokenName(token.name);
-    setTokenSymbol(token.symbol);
+  const openFaucet = (url: string) => {
+    window.open(url, '_blank');
   };
 
   if (!wallet) {
@@ -139,7 +90,7 @@ const TokenMint: React.FC<TokenMintProps> = ({ wallet, onMintComplete }) => {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            代币生产
+            测试网代币水龙头
           </Typography>
           <Alert severity="warning">
             请先选择一个钱包
@@ -152,174 +103,117 @@ const TokenMint: React.FC<TokenMintProps> = ({ wallet, onMintComplete }) => {
   return (
     <Box>
       <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <AccountBalance />
-        代币生产中心
+        <Water />
+        Cosmos测试网代币水龙头
       </Typography>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* 铸造表单和快速选择 */}
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          <Card sx={{ flex: 1, minWidth: '400px' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                铸造新代币
+        {/* 当前钱包信息 */}
+        <Alert severity="info">
+          当前钱包: {wallet.address}
+        </Alert>
+
+        {error && (
+          <Alert severity="error">
+            {error}
+          </Alert>
+        )}
+
+        {/* 当前余额 */}
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">
+                当前余额
               </Typography>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                铸造钱包: {wallet?.address?.slice(0, 20)}...
-              </Typography>
-
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
-
-              {success && (
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  {success}
-                </Alert>
-              )}
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField
-                  fullWidth
-                  label="代币名称"
-                  value={tokenName}
-                  onChange={(e) => setTokenName(e.target.value)}
-                  placeholder="例如: My Custom Token"
-                  disabled={loading}
-                />
-
-                <TextField
-                  fullWidth
-                  label="代币符号"
-                  value={tokenSymbol}
-                  onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-                  placeholder="例如: MCT"
-                  disabled={loading}
-                  slotProps={{ 
-                    htmlInput: { maxLength: 10 }
-                  }}
-                />
-
-                <TextField
-                  fullWidth
-                  label="铸造数量"
-                  type="number"
-                  value={mintAmount}
-                  onChange={(e) => setMintAmount(e.target.value)}
-                  placeholder="1000000"
-                  disabled={loading}
-                  slotProps={{
-                    htmlInput: {
-                      step: "1",
-                      min: "1"
-                    }
-                  }}
-                />
-
-                <Button
-                  variant="contained"
-                  onClick={handleMint}
-                  disabled={loading || !tokenName || !tokenSymbol || !mintAmount}
-                  startIcon={loading ? <CircularProgress size={20} /> : <Add />}
-                  fullWidth
-                >
-                  {loading ? '铸造中...' : '铸造代币'}
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* 快速选择 */}
-          <Card sx={{ flex: 1, minWidth: '400px' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                快速选择
-              </Typography>
-              
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                选择预定义的代币模板
-              </Typography>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {predefinedTokens.map((token, index) => (
-                  <Paper
-                    key={index}
-                    elevation={1}
-                    sx={{
-                      p: 2,
-                      cursor: 'pointer',
-                      '&:hover': {
-                        bgcolor: 'action.hover'
-                      }
-                    }}
-                    onClick={() => selectPredefinedToken(token)}
-                  >
-                    <Typography variant="subtitle2" fontWeight="bold">
-                      {token.name} ({token.symbol})
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      点击选择此代币模板
-                    </Typography>
-                  </Paper>
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
-
-        {/* 铸造历史 */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                铸造历史
-              </Typography>
-              
-              {mintedTokens.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  暂无铸造记录
-                </Typography>
+              <Button
+                variant="outlined"
+                onClick={refreshBalance}
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} /> : <Refresh />}
+              >
+                {loading ? '刷新中...' : '刷新余额'}
+              </Button>
+            </Box>
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {balance.length > 0 ? (
+                balance.map((token) => (
+                  <Chip
+                    key={token.denom}
+                    label={`${(parseFloat(token.amount) / 1000000).toFixed(6)} ${token.denom.replace('u', '').toUpperCase()}`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))
               ) : (
-                <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-                  {mintedTokens.map((token, index) => (
-                    <Paper
-                      key={index}
-                      elevation={1}
-                      sx={{ p: 2, mb: 1 }}
-                    >
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-                        <Box sx={{ flex: 1, minWidth: '200px' }}>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {token.name} ({token.symbol})
-                          </Typography>
-                        </Box>
-                        <Box sx={{ flex: 1, minWidth: '150px' }}>
-                          <Typography variant="body2">
-                            数量: {parseFloat(token.amount).toLocaleString()}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ flex: 1, minWidth: '200px' }}>
-                          <Typography variant="caption" color="text.secondary">
-                            交易哈希: {token.txHash.slice(0, 16)}...
-                          </Typography>
-                        </Box>
-                        <Box sx={{ flex: 1, minWidth: '150px' }}>
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(token.timestamp).toLocaleString()}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  ))}
-                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  暂无余额 - 请从下方水龙头获取测试代币
+                </Typography>
               )}
-            </CardContent>
-          </Card>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* 官方水龙头信息 */}
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              官方测试网水龙头
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              由于这是连接到真实Cosmos网络的应用，需要从官方水龙头获取测试代币
+            </Typography>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 2 }}>
+              {faucetInfo.map((info) => (
+                <Card variant="outlined" sx={{ height: '100%' }} key={info.denom}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      <Typography variant="h6">
+                        {info.name}
+                      </Typography>
+                      <Chip 
+                        size="small" 
+                        label={info.denom}
+                        color="secondary" 
+                        variant="outlined" 
+                      />
+                    </Box>
+                    
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {info.description}
+                    </Typography>
+                    
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      <strong>获取方式:</strong> {info.testAmount}
+                    </Typography>
+
+                    <Button
+                      variant="contained"
+                      onClick={() => openFaucet(info.officialFaucet)}
+                      fullWidth
+                      startIcon={<OpenInNew />}
+                    >
+                      访问官方水龙头
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* 说明信息 */}
+        <Alert severity="info">
+          <Typography variant="body2">
+            <strong>说明:</strong> 本应用连接到真实的Cosmos网络，不提供模拟代币。
+            请通过官方水龙头获取测试代币后，使用"刷新余额"按钮查看最新余额。
+          </Typography>
+        </Alert>
       </Box>
     </Box>
   );
 };
 
-export default TokenMint;
+export default TokenFaucet;

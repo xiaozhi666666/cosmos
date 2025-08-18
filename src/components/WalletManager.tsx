@@ -12,7 +12,7 @@
  * 所有钱包数据都存储在localStorage中，刷新页面后仍然保留
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -48,21 +48,7 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
   const [error, setError] = useState<string | null>(null);
   const [showMnemonic, setShowMnemonic] = useState<{[key: string]: boolean}>({});
 
-  useEffect(() => {
-    loadWalletsFromStorage();
-  }, []);
-
-  const loadWalletsFromStorage = () => {
-    const stored = localStorage.getItem('cosmos-wallets');
-    if (stored) {
-      setWallets(JSON.parse(stored));
-    }
-  };
-
-  const saveWalletsToStorage = (updatedWallets: Wallet[]) => {
-    localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
-    setWallets(updatedWallets);
-  };
+  // 不再从localStorage加载，每次都重新创建钱包
 
   const createNewWallet = async () => {
     setLoading(true);
@@ -79,11 +65,11 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
       };
       
       const updatedWallets = [...wallets, newWallet];
-      saveWalletsToStorage(updatedWallets);
+      setWallets(updatedWallets);
       setCreateDialogOpen(false);
       onWalletSelect(newWallet);
     } catch (err) {
-      setError('Failed to create wallet: ' + (err as Error).message);
+      setError('创建钱包失败: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -91,7 +77,7 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
 
   const importWallet = async () => {
     if (!mnemonic.trim()) {
-      setError('Please enter a valid mnemonic phrase');
+      setError('请输入有效的助记词');
       return;
     }
 
@@ -109,12 +95,12 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
       };
       
       const updatedWallets = [...wallets, importedWallet];
-      saveWalletsToStorage(updatedWallets);
+      setWallets(updatedWallets);
       setImportDialogOpen(false);
       setMnemonic('');
       onWalletSelect(importedWallet);
     } catch (err) {
-      setError('Failed to import wallet: ' + (err as Error).message);
+      setError('导入钱包失败: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -126,13 +112,14 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
       const updatedWallets = wallets.map(w => 
         w.address === wallet.address ? { ...w, balance } : w
       );
-      saveWalletsToStorage(updatedWallets);
+      setWallets(updatedWallets);
       
       if (selectedWallet?.address === wallet.address) {
         onWalletSelect({ ...wallet, balance });
       }
     } catch (err) {
-      console.error('Failed to refresh balance:', err);
+      console.error('刷新余额失败:', err);
+      setError('刷新余额失败: ' + (err as Error).message);
     }
   };
 
@@ -235,7 +222,7 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
                     wallet.balance.map((token) => (
                       <Chip
                         key={token.denom}
-                        label={`${(parseFloat(token.amount) / 1000000).toFixed(6)} ${token.denom.replace('u', '').toUpperCase()}`}
+                        label={`${parseFloat(token.amount).toFixed(6)} ${token.denom}`}
                         size="small"
                         color="primary"
                         variant="outlined"

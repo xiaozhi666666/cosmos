@@ -14,7 +14,7 @@
  * - 区块浏览器：查看区块和交易信息
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   AppBar,
@@ -30,10 +30,13 @@ import {
 import { AccountBalance } from '@mui/icons-material';
 import WalletManager from './components/WalletManager';
 import TokenTransfer from './components/TokenTransfer';
-import TokenMint from './components/TokenMint';
-import Mining from './components/Mining';
+import TokenFaucet from './components/TokenMint';
+import Staking from './components/Mining';
 import BlockExplorer from './components/BlockExplorer';
+import RPCTester from './components/RPCTester';
 import { Wallet } from './types';
+import { cosmosService } from './services/cosmos';
+import { integrationService } from './services/integration';
 
 // Material-UI 主题配置
 // 定义应用的整体视觉风格和颜色方案
@@ -97,6 +100,26 @@ function App() {
   // 当前激活的标签页索引
   const [tabValue, setTabValue] = useState(0);
 
+  // 初始化集成服务
+  useEffect(() => {
+    const initServices = async () => {
+      try {
+        console.log('正在初始化集成服务...');
+        await integrationService.initialize();
+        console.log('集成服务初始化完成');
+      } catch (error) {
+        console.error('集成服务初始化失败:', error);
+      }
+    };
+
+    initServices();
+
+    // 清理函数
+    return () => {
+      integrationService.destroy();
+    };
+  }, []);
+
   /**
    * 处理标签页切换事件
    * @param _ - 事件对象（未使用）
@@ -117,39 +140,65 @@ function App() {
 
   /**
    * 处理转账完成事件
-   * 转账成功后可以在这里执行相关操作，如刷新余额
+   * 转账成功后刷新钱包余额
    */
-  const handleTransferComplete = () => {
-    // 刷新钱包余额
+  const handleTransferComplete = async () => {
     if (selectedWallet) {
-      // 这里可以触发余额刷新
       console.log('Transfer completed, refreshing wallet balance...');
+      await updateWalletBalance();
     }
   };
 
   /**
    * 处理代币铸造完成事件
-   * 铸造成功后的回调处理
+   * 铸造成功后刷新钱包余额
    */
-  const handleMintComplete = () => {
-    console.log('Token mint completed');
+  const handleMintComplete = async () => {
+    console.log('Token mint completed, refreshing wallet balance...');
+    if (selectedWallet) {
+      await updateWalletBalance();
+    }
   };
 
   /**
    * 处理钱包余额更新事件
-   * 当挖矿等操作更新余额后，刷新当前选中钱包的余额显示
+   * 从区块链获取最新余额并更新钱包信息
    */
-  const handleBalanceUpdate = () => {
-    if (selectedWallet) {
-      // 从localStorage重新加载钱包数据
+  const handleBalanceUpdate = async () => {
+    await updateWalletBalance();
+  };
+
+  /**
+   * 更新钱包余额
+   * 从区块链获取最新余额并更新localStorage和状态
+   */
+  const updateWalletBalance = async () => {
+    if (!selectedWallet) return;
+
+    try {
+      // 从区块链获取最新余额
+      const latestBalance = await cosmosService.getBalance(selectedWallet.address);
+      
+      // 更新当前选中的钱包状态
+      const updatedWallet = {
+        ...selectedWallet,
+        balance: latestBalance
+      };
+      setSelectedWallet(updatedWallet);
+
+      // 更新localStorage中的钱包数据
       const stored = localStorage.getItem('cosmos-wallets');
       if (stored) {
         const wallets = JSON.parse(stored);
-        const updatedWallet = wallets.find((w: Wallet) => w.address === selectedWallet.address);
-        if (updatedWallet) {
-          setSelectedWallet(updatedWallet);
-        }
+        const updatedWallets = wallets.map((w: Wallet) => 
+          w.address === selectedWallet.address ? updatedWallet : w
+        );
+        localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
       }
+
+      console.log('Wallet balance updated:', latestBalance);
+    } catch (error) {
+      console.error('Failed to update wallet balance:', error);
     }
   };
 
@@ -183,10 +232,11 @@ function App() {
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="cosmos app tabs">
               <Tab label="钱包管理" />
-              <Tab label="代币生产" />
+              <Tab label="代币水龙头" />
               <Tab label="代币转账" />
-              <Tab label="挖矿" />
+              <Tab label="质押委托" />
               <Tab label="区块浏览器" />
+              <Tab label="RPC测试" />
             </Tabs>
           </Box>
 
@@ -198,10 +248,11 @@ function App() {
             />
           </TabPanel>
 
-          {/* 代币铸造页面 */}
+          {/* 代币水龙头页面 */}
           <TabPanel value={tabValue} index={1}>
-            <TokenMint 
+            <TokenFaucet 
               wallet={selectedWallet}
+              onBalanceUpdate={handleBalanceUpdate}
               onMintComplete={handleMintComplete}
             />
           </TabPanel>
@@ -214,14 +265,19 @@ function App() {
             />
           </TabPanel>
 
-          {/* 挖矿页面 */}
+          {/* 质押委托页面 */}
           <TabPanel value={tabValue} index={3}>
-            <Mining wallet={selectedWallet} onBalanceUpdate={handleBalanceUpdate} />
+            <Staking wallet={selectedWallet} onBalanceUpdate={handleBalanceUpdate} />
           </TabPanel>
 
           {/* 区块浏览器页面 */}
           <TabPanel value={tabValue} index={4}>
             <BlockExplorer />
+          </TabPanel>
+
+          {/* RPC测试页面 */}
+          <TabPanel value={tabValue} index={5}>
+            <RPCTester />
           </TabPanel>
         </Container>
       </Box>

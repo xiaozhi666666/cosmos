@@ -15,7 +15,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
 
 // 创建React应用的根节点
 const root = ReactDOM.createRoot(
@@ -28,8 +27,3 @@ root.render(
     <App />
   </React.StrictMode>
 );
-
-// 性能监控工具，用于测量和报告应用性能指标
-// 如果需要启用性能监控，可以传入回调函数处理结果
-// 了解更多: https://bit.ly/CRA-vitals
-reportWebVitals();

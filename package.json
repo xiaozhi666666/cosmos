@@ -3,7 +3,14 @@
   "name": "cosmos",
   "version": "0.1.0",
   "description": "本地区块链模拟应用，提供完整的Cosmos生态功能演示",
-  "keywords": ["blockchain", "cosmos", "react", "typescript", "wallet", "mining"],
+  "keywords": [
+    "blockchain",
+    "cosmos",
+    "react",
+    "typescript",
+    "wallet",
+    "mining"
+  ],
   "private": true,
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.36.0",
@@ -27,6 +34,7 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "crypto-js": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.1",
@@ -57,5 +65,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2"
   }
 }

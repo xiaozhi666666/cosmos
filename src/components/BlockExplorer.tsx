@@ -48,7 +48,14 @@ const BlockExplorer: React.FC = () => {
   useEffect(() => {
     loadLatestBlock();
     loadChainInfo();
-  }, []);
+    
+    // 设置自动刷新，每10秒更新一次
+    const interval = setInterval(() => {
+      loadLatestBlock();
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadChainInfo = async () => {
     try {
