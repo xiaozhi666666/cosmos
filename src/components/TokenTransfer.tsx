@@ -44,6 +44,54 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const updateTransferBalances = (fromAddress: string, toAddress: string, amount: string, denom: string) => {
+    try {
+      const stored = localStorage.getItem('cosmos-wallets');
+      if (stored) {
+        const wallets = JSON.parse(stored);
+        const updatedWallets = wallets.map((w: Wallet) => {
+          if (w.address === fromAddress) {
+            // 扣除发送方余额
+            const updatedBalance = w.balance.map(token => {
+              if (token.denom === denom) {
+                const currentAmount = parseFloat(token.amount);
+                const transferAmount = parseFloat(amount);
+                return {
+                  ...token,
+                  amount: (currentAmount - transferAmount).toString()
+                };
+              }
+              return token;
+            });
+            return { ...w, balance: updatedBalance };
+          } else if (w.address === toAddress) {
+            // 增加接收方余额
+            const updatedBalance = [...w.balance];
+            const tokenIndex = updatedBalance.findIndex(token => token.denom === denom);
+            
+            if (tokenIndex >= 0) {
+              // 更新现有代币余额
+              const currentAmount = parseFloat(updatedBalance[tokenIndex].amount);
+              const transferAmount = parseFloat(amount);
+              updatedBalance[tokenIndex].amount = (currentAmount + transferAmount).toString();
+            } else {
+              // 添加新的代币类型
+              updatedBalance.push({ denom, amount });
+            }
+            
+            return { ...w, balance: updatedBalance };
+          }
+          return w;
+        });
+        
+        localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
+        console.log(`转账余额已更新: ${fromAddress} -> ${toAddress}, ${(parseFloat(amount) / 1000000).toFixed(6)} ${denom.replace('u', '').toUpperCase()}`);
+      }
+    } catch (error) {
+      console.error('更新转账余额失败:', error);
+    }
+  };
+
   const handleTransfer = async () => {
     if (!wallet) {
       setError('请先选择钱包');
@@ -81,6 +129,9 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
         amountInMicroUnits,
         selectedDenom
       );
+
+      // 更新发送方和接收方余额
+      updateTransferBalances(wallet.address, toAddress, amountInMicroUnits, selectedDenom);
 
       setSuccess(`转账成功！交易哈希: ${txHash}`);
       setToAddress('');
@@ -151,9 +202,11 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
               placeholder="0.000000"
               disabled={loading}
               sx={{ flex: 1 }}
-              inputProps={{
-                step: "0.000001",
-                min: "0"
+              slotProps={{
+                htmlInput: {
+                  step: "0.000001",
+                  min: "0"
+                }
               }}
             />
 

@@ -135,6 +135,24 @@ function App() {
     console.log('Token mint completed');
   };
 
+  /**
+   * 处理钱包余额更新事件
+   * 当挖矿等操作更新余额后，刷新当前选中钱包的余额显示
+   */
+  const handleBalanceUpdate = () => {
+    if (selectedWallet) {
+      // 从localStorage重新加载钱包数据
+      const stored = localStorage.getItem('cosmos-wallets');
+      if (stored) {
+        const wallets = JSON.parse(stored);
+        const updatedWallet = wallets.find((w: Wallet) => w.address === selectedWallet.address);
+        if (updatedWallet) {
+          setSelectedWallet(updatedWallet);
+        }
+      }
+    }
+  };
+
   return (
     // 应用主题提供器，为整个应用提供统一的样式主题
     <ThemeProvider theme={theme}>
@@ -198,7 +216,7 @@ function App() {
 
           {/* 挖矿页面 */}
           <TabPanel value={tabValue} index={3}>
-            <Mining wallet={selectedWallet} />
+            <Mining wallet={selectedWallet} onBalanceUpdate={handleBalanceUpdate} />
           </TabPanel>
 
           {/* 区块浏览器页面 */}

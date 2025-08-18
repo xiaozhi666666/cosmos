@@ -30,9 +30,10 @@ import { Wallet, MiningReward } from '../types';
 
 interface MiningProps {
   wallet: Wallet | null;
+  onBalanceUpdate?: () => void;
 }
 
-const Mining: React.FC<MiningProps> = ({ wallet }) => {
+const Mining: React.FC<MiningProps> = ({ wallet, onBalanceUpdate }) => {
   const [isMining, setIsMining] = useState(false);
   const [miningProgress, setMiningProgress] = useState(0);
   const [rewards, setRewards] = useState<MiningReward[]>([]);
@@ -120,6 +121,14 @@ const Mining: React.FC<MiningProps> = ({ wallet }) => {
       const updatedRewards = [newReward, ...rewards].slice(0, 20); // 保留最近20条记录
       saveMiningHistory(updatedRewards);
       
+      // 更新钱包余额
+      updateWalletBalance(wallet.address, rewardAmount, 'uatom');
+      
+      // 通知父组件余额已更新
+      if (onBalanceUpdate) {
+        onBalanceUpdate();
+      }
+      
       setMiningProgress(100);
       
       setTimeout(() => {
@@ -132,6 +141,40 @@ const Mining: React.FC<MiningProps> = ({ wallet }) => {
       setIsMining(false);
       setMiningProgress(0);
       clearInterval(progressInterval);
+    }
+  };
+
+  const updateWalletBalance = (address: string, amount: string, denom: string) => {
+    try {
+      const stored = localStorage.getItem('cosmos-wallets');
+      if (stored) {
+        const wallets = JSON.parse(stored);
+        const updatedWallets = wallets.map((w: Wallet) => {
+          if (w.address === address) {
+            const updatedBalance = [...w.balance];
+            const tokenIndex = updatedBalance.findIndex(token => token.denom === denom);
+            
+            if (tokenIndex >= 0) {
+              // 更新现有代币余额
+              const currentAmount = parseFloat(updatedBalance[tokenIndex].amount);
+              const rewardAmount = parseFloat(amount) * 1000000; // uatom 转换
+              updatedBalance[tokenIndex].amount = (currentAmount + rewardAmount).toString();
+            } else {
+              // 添加新的代币类型
+              const rewardAmount = parseFloat(amount) * 1000000; // uatom 转换
+              updatedBalance.push({ denom, amount: rewardAmount.toString() });
+            }
+            
+            return { ...w, balance: updatedBalance };
+          }
+          return w;
+        });
+        
+        localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
+        console.log(`钱包余额已更新: +${amount} ${denom.replace('u', '').toUpperCase()}`);
+      }
+    } catch (error) {
+      console.error('更新钱包余额失败:', error);
     }
   };
 
