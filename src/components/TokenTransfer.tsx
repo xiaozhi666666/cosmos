@@ -103,7 +103,7 @@ const TokenTransfer: React.FC<TokenTransferProps> = ({ wallet, onTransferComplet
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          从钱包: {wallet.address.slice(0, 20)}...
+          从钱包: {wallet?.address?.slice(0, 20)}...
         </Typography>
 
         {error && (

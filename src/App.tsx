@@ -89,9 +89,9 @@ function App() {
           <Toolbar>
             <AccountBalance sx={{ mr: 2 }} />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Cosmos 区块链应用
+              Cosmos 本地区块链应用
             </Typography>
-            {selectedWallet && (
+            {selectedWallet && selectedWallet.address && (
               <Typography variant="body2" sx={{ ml: 2 }}>
                 当前钱包: {selectedWallet.address.slice(0, 10)}...
               </Typography>

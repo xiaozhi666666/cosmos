@@ -1,7 +1,6 @@
 import { StargateClient, SigningStargateClient } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { GasPrice } from '@cosmjs/stargate';
-import { Tendermint34Client } from '@cosmjs/tendermint-rpc';
 
 export interface WalletInfo {
   address: string;
@@ -35,44 +34,43 @@ export class CosmosService {
   private client: StargateClient | null = null;
   private signingClient: SigningStargateClient | null = null;
   private wallet: DirectSecp256k1HdWallet | null = null;
-  private rpcEndpoint: string;
-  private backupEndpoints: string[] = [
-    'https://cosmos-rpc.polkachu.com',
-    'https://rpc.cosmos.network:443',
-    'https://cosmos-rpc.publicnode.com:443',
-    'https://rpc-cosmoshub.blockapsis.com',
-    'https://cosmos-rpc.staketab.org:443'
-  ];
+  private useLocalChain: boolean = true; // 使用本地模拟链
 
-  constructor(rpcEndpoint?: string) {
-    this.rpcEndpoint = rpcEndpoint || this.backupEndpoints[0];
+  constructor() {
+    // 启动本地区块链
+    if (this.useLocalChain) {
+      // 延迟导入以避免循环依赖
+      import('./mockBlockchain').then(({ mockBlockchain }) => {
+        mockBlockchain.startBlockGeneration();
+        console.log('本地模拟区块链已启动');
+      });
+    }
   }
 
   async connect(): Promise<void> {
-    let lastError: any = null;
-    
-    for (const endpoint of this.backupEndpoints) {
-      try {
-        console.log(`尝试连接到: ${endpoint}`);
-        this.client = await StargateClient.connect(endpoint);
-        this.rpcEndpoint = endpoint;
-        console.log(`成功连接到: ${endpoint}`);
-        return;
-      } catch (error) {
-        console.warn(`连接失败 ${endpoint}:`, error);
-        lastError = error;
-        continue;
-      }
+    if (this.useLocalChain) {
+      console.log('使用本地模拟区块链，无需连接外部网络');
+      return;
     }
     
-    console.error('所有 RPC 端点连接失败');
-    throw lastError || new Error('所有 RPC 端点都无法连接');
+    // 在本地模式下不需要网络连接
+    console.log('本地模拟模式已启用，跳过网络连接');
   }
 
   async createWallet(): Promise<WalletInfo> {
     try {
       const wallet = await DirectSecp256k1HdWallet.generate(24);
-      const [account] = await wallet.getAccounts();
+      const accounts = await wallet.getAccounts();
+      
+      if (!accounts || accounts.length === 0) {
+        throw new Error('Failed to generate wallet accounts');
+      }
+      
+      const [account] = accounts;
+      
+      if (!account || !account.address) {
+        throw new Error('Failed to get wallet address from account');
+      }
       
       return {
         address: account.address,
@@ -88,7 +86,17 @@ export class CosmosService {
   async importWallet(mnemonic: string): Promise<WalletInfo> {
     try {
       const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);
-      const [account] = await wallet.getAccounts();
+      const accounts = await wallet.getAccounts();
+      
+      if (!accounts || accounts.length === 0) {
+        throw new Error('Failed to import wallet accounts');
+      }
+      
+      const [account] = accounts;
+      
+      if (!account || !account.address) {
+        throw new Error('Failed to get wallet address from imported account');
+      }
       
       this.wallet = wallet;
       
@@ -105,19 +113,17 @@ export class CosmosService {
 
   async getSigningClient(mnemonic: string): Promise<SigningStargateClient> {
     try {
+      if (this.useLocalChain) {
+        // 在本地模式下，不需要真实的 signing client
+        throw new Error('本地模式不支持真实的签名客户端');
+      }
+
       if (!this.wallet) {
         this.wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);
       }
       
-      this.signingClient = await SigningStargateClient.connectWithSigner(
-        this.rpcEndpoint,
-        this.wallet,
-        {
-          gasPrice: GasPrice.fromString('0.025uatom'),
-        }
-      );
-      
-      return this.signingClient;
+      // 这里需要网络连接，但在本地模式下不会执行到
+      throw new Error('网络模式已禁用');
     } catch (error) {
       console.error('Failed to get signing client:', error);
       throw error;
@@ -126,6 +132,15 @@ export class CosmosService {
 
   async getBalance(address: string): Promise<TokenInfo[]> {
     try {
+      if (this.useLocalChain) {
+        const { mockBlockchain } = await import('./mockBlockchain');
+        const balance = mockBlockchain.getAccountBalance(address);
+        return balance.map((coin: any) => ({
+          denom: coin.denom,
+          amount: coin.amount
+        }));
+      }
+
       if (!this.client) {
         await this.connect();
       }
@@ -146,9 +161,24 @@ export class CosmosService {
     fromAddress: string,
     toAddress: string,
     amount: string,
-    denom: string = 'uatom'
+    denom: string = 'stake'
   ): Promise<string> {
     try {
+      if (this.useLocalChain) {
+        // 模拟转账交易
+        const { mockBlockchain } = await import('./mockBlockchain');
+        const txHash = mockBlockchain.addTransaction({
+          from: fromAddress,
+          to: toAddress,
+          amount,
+          denom,
+          fee: '0.001'
+        });
+        
+        console.log(`本地转账已提交: ${txHash}`);
+        return txHash;
+      }
+
       const signingClient = await this.getSigningClient(mnemonic);
       
       const fee = {
@@ -173,6 +203,17 @@ export class CosmosService {
 
   async getLatestBlock(): Promise<BlockInfo> {
     try {
+      if (this.useLocalChain) {
+        const { mockBlockchain } = await import('./mockBlockchain');
+        const block = mockBlockchain.getLatestBlock();
+        return {
+          height: block.height,
+          hash: block.hash,
+          time: block.timestamp,
+          txCount: block.transactions.length
+        };
+      }
+
       if (!this.client) {
         await this.connect();
       }
@@ -193,6 +234,20 @@ export class CosmosService {
 
   async getBlockByHeight(height: number): Promise<BlockInfo> {
     try {
+      if (this.useLocalChain) {
+        const { mockBlockchain } = await import('./mockBlockchain');
+        const block = mockBlockchain.getBlockByHeight(height);
+        if (!block) {
+          throw new Error(`区块 #${height} 未找到`);
+        }
+        return {
+          height: block.height,
+          hash: block.hash,
+          time: block.timestamp,
+          txCount: block.transactions.length
+        };
+      }
+
       if (!this.client) {
         await this.connect();
       }
@@ -213,6 +268,11 @@ export class CosmosService {
 
   async getChainId(): Promise<string> {
     try {
+      if (this.useLocalChain) {
+        const { mockBlockchain } = await import('./mockBlockchain');
+        return mockBlockchain.getChainInfo().chainId;
+      }
+
       if (!this.client) {
         await this.connect();
       }
@@ -226,25 +286,30 @@ export class CosmosService {
 
   async getValidators(): Promise<any[]> {
     try {
-      // 确保先连接到可用的RPC端点
-      if (!this.client) {
-        await this.connect();
+      if (this.useLocalChain) {
+        const { mockBlockchain } = await import('./mockBlockchain');
+        return mockBlockchain.getValidators();
       }
-      
-      const tmClient = await Tendermint34Client.connect(this.rpcEndpoint);
-      const validators = await tmClient.validatorsAll();
-      return [...validators.validators];
+
+      // 网络模式已禁用
+      throw new Error('网络模式已禁用');
     } catch (error) {
       console.error('获取验证者失败:', error);
       throw error;
     }
   }
 
-  async simulateMining(_validatorAddress: string): Promise<string> {
+  async simulateMining(validatorAddress: string): Promise<string> {
     return new Promise((resolve) => {
-      setTimeout(() => {
-        const reward = (Math.random() * 10 + 1).toFixed(6);
-        resolve(reward);
+      setTimeout(async () => {
+        if (this.useLocalChain) {
+          const { mockBlockchain } = await import('./mockBlockchain');
+          const reward = mockBlockchain.simulateMining(validatorAddress);
+          resolve(reward.toFixed(6));
+        } else {
+          const reward = (Math.random() * 10 + 1).toFixed(6);
+          resolve(reward);
+        }
       }, 2000);
     });
   }

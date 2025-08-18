@@ -153,7 +153,7 @@ const TokenMint: React.FC<TokenMintProps> = ({ wallet, onMintComplete }) => {
               </Typography>
 
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                铸造钱包: {wallet.address.slice(0, 20)}...
+                铸造钱包: {wallet?.address?.slice(0, 20)}...
               </Typography>
 
               {error && (

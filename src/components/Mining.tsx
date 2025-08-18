@@ -164,7 +164,7 @@ const Mining: React.FC<MiningProps> = ({ wallet }) => {
               </Typography>
               
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                当前钱包: {wallet.address.slice(0, 20)}...
+                当前钱包: {wallet?.address?.slice(0, 20)}...
               </Typography>
 
               <Box sx={{ mb: 2 }}>
