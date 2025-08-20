@@ -32,6 +32,7 @@ import WalletManager from './components/WalletManager';
 import TokenTransfer from './components/TokenTransfer';
 import TokenFaucet from './components/TokenMint';
 import Staking from './components/Mining';
+import MiningTab from './components/MiningTab';
 import BlockExplorer from './components/BlockExplorer';
 import RPCTester from './components/RPCTester';
 import { Wallet } from './types';
@@ -235,6 +236,7 @@ function App() {
               <Tab label="代币水龙头" />
               <Tab label="代币转账" />
               <Tab label="质押委托" />
+              <Tab label="本地挖矿" />
               <Tab label="区块浏览器" />
               <Tab label="RPC测试" />
             </Tabs>
@@ -270,13 +272,18 @@ function App() {
             <Staking wallet={selectedWallet} onBalanceUpdate={handleBalanceUpdate} />
           </TabPanel>
 
-          {/* 区块浏览器页面 */}
+          {/* 本地挖矿页面 */}
           <TabPanel value={tabValue} index={4}>
+            <MiningTab wallet={selectedWallet} onBalanceUpdate={handleBalanceUpdate} />
+          </TabPanel>
+
+          {/* 区块浏览器页面 */}
+          <TabPanel value={tabValue} index={5}>
             <BlockExplorer />
           </TabPanel>
 
           {/* RPC测试页面 */}
-          <TabPanel value={tabValue} index={5}>
+          <TabPanel value={tabValue} index={6}>
             <RPCTester />
           </TabPanel>
         </Container>

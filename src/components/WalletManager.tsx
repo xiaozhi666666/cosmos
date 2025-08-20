@@ -12,7 +12,7 @@
  * 所有钱包数据都存储在localStorage中，刷新页面后仍然保留
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -48,7 +48,23 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
   const [error, setError] = useState<string | null>(null);
   const [showMnemonic, setShowMnemonic] = useState<{[key: string]: boolean}>({});
 
-  // 不再从localStorage加载，每次都重新创建钱包
+  // 从localStorage加载钱包列表
+  useEffect(() => {
+    const loadWallets = () => {
+      try {
+        const stored = localStorage.getItem('cosmos-wallets');
+        if (stored) {
+          const parsedWallets = JSON.parse(stored);
+          setWallets(parsedWallets);
+          console.log('已加载钱包列表:', parsedWallets.length, '个钱包');
+        }
+      } catch (error) {
+        console.error('加载钱包列表失败:', error);
+      }
+    };
+    
+    loadWallets();
+  }, []);
 
   const createNewWallet = async () => {
     setLoading(true);
@@ -66,6 +82,10 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
       
       const updatedWallets = [...wallets, newWallet];
       setWallets(updatedWallets);
+      
+      // 保存到localStorage
+      localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
+      
       setCreateDialogOpen(false);
       onWalletSelect(newWallet);
     } catch (err) {
@@ -96,6 +116,10 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
       
       const updatedWallets = [...wallets, importedWallet];
       setWallets(updatedWallets);
+      
+      // 保存到localStorage
+      localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
+      
       setImportDialogOpen(false);
       setMnemonic('');
       onWalletSelect(importedWallet);
@@ -113,6 +137,9 @@ const WalletManager: React.FC<WalletManagerProps> = ({ onWalletSelect, selectedW
         w.address === wallet.address ? { ...w, balance } : w
       );
       setWallets(updatedWallets);
+      
+      // 保存到localStorage
+      localStorage.setItem('cosmos-wallets', JSON.stringify(updatedWallets));
       
       if (selectedWallet?.address === wallet.address) {
         onWalletSelect({ ...wallet, balance });

@@ -10,7 +10,7 @@
  * - 错误处理：统一的错误处理和重试机制
  */
 
-import { blockchain, Transaction } from './blockchain';
+import { getBlockchain, Transaction } from './blockchain';
 import { cosmosService, WalletInfo, TokenInfo } from './cosmos';
 import { rpcService } from './rpc';
 
@@ -111,7 +111,7 @@ export class IntegrationService {
     try {
       // 优先从本地链获取
       if (this.config.preferLocalChain) {
-        const localBalances = blockchain.getAllBalances(address);
+        const localBalances = getBlockchain().getAllBalances(address);
         if (localBalances.length > 0) {
           return localBalances;
         }
@@ -123,11 +123,11 @@ export class IntegrationService {
           return await cosmosService.getBalance(address);
         } catch (cosmosError) {
           console.warn('Cosmos余额查询失败，使用本地余额:', cosmosError);
-          return blockchain.getAllBalances(address);
+          return getBlockchain().getAllBalances(address);
         }
       }
 
-      return blockchain.getAllBalances(address);
+      return getBlockchain().getAllBalances(address);
     } catch (error) {
       console.error('获取统一余额失败:', error);
       throw error;
@@ -169,14 +169,14 @@ export class IntegrationService {
         return { txHash, source: 'cosmos' };
       } else {
         // 使用本地链发送交易
-        const transaction = blockchain.createTransaction(
+        const transaction = getBlockchain().createTransaction(
           from,
           to,
           parseFloat(amount),
           denom
         );
 
-        const success = blockchain.addTransaction(transaction);
+        const success = getBlockchain().addTransaction(transaction);
         if (!success) {
           throw new Error('本地交易被拒绝');
         }
@@ -200,7 +200,7 @@ export class IntegrationService {
 
     try {
       // 获取本地余额
-      const localBalances = blockchain.getAllBalances(address);
+      const localBalances = getBlockchain().getAllBalances(address);
       
       // 获取Cosmos余额
       let cosmosBalances: TokenInfo[] = [];
@@ -501,7 +501,7 @@ export class IntegrationService {
       (transaction as any).cosmosHash = cosmosHash;
       (transaction as any).source = 'cosmos';
 
-      blockchain.addTransaction(transaction);
+      getBlockchain().addTransaction(transaction);
       console.log(`交易已同步到本地链: ${transaction.id}`);
     } catch (error) {
       console.warn('同步交易到本地链失败:', error);

@@ -11,7 +11,7 @@
  * - 网络信息：链状态、网络配置
  */
 
-import { blockchain, Block, ITransaction } from './blockchain';
+import { getBlockchain, Block, ITransaction } from './blockchain';
 import { cosmosService, WalletInfo, TokenInfo } from './cosmos';
 
 // RPC方法类型定义
@@ -106,8 +106,8 @@ class MiningManager {
     
     this.intervalId = setInterval(async () => {
       try {
-        if (blockchain.transactionPool.getSize() > 0) {
-          const block = blockchain.mineBlock(minerAddress);
+        if (getBlockchain().transactionPool.getSize() > 0) {
+          const block = getBlockchain().mineBlock(minerAddress);
           console.log(`挖到新区块: #${block.index}`);
           
           if (this.miningCallback) {
@@ -133,7 +133,7 @@ class MiningManager {
   getStatus(): { active: boolean; pendingTx: number } {
     return {
       active: this.isActive,
-      pendingTx: blockchain.transactionPool.getSize()
+      pendingTx: getBlockchain().transactionPool.getSize()
     };
   }
 }
@@ -216,7 +216,7 @@ export class RPCService {
     switch (method) {
       // 区块链查询方法
       case 'getBlockCount':
-        return blockchain.chain.length;
+        return getBlockchain().chain.length;
 
       case 'getBlock':
         return this.getBlock(params);
@@ -302,15 +302,15 @@ export class RPCService {
 
   private getBlock(params: { height?: number; hash?: string }): Block | null {
     if (params.height !== undefined) {
-      return blockchain.chain[params.height] || null;
+      return getBlockchain().chain[params.height] || null;
     }
     
     if (params.hash) {
-      return blockchain.chain.find(block => block.hash === params.hash) || null;
+      return getBlockchain().chain.find(block => block.hash === params.hash) || null;
     }
     
     // 返回最新区块
-    return blockchain.getLatestBlock();
+    return getBlockchain().getLatestBlock();
   }
 
   private getTransaction(params: { txid: string }): ITransaction | null {
@@ -320,14 +320,14 @@ export class RPCService {
       throw error;
     }
 
-    for (const block of blockchain.chain) {
+    for (const block of getBlockchain().chain) {
       const tx = block.data.find(t => t.id === params.txid);
       if (tx) {
         return {
           ...tx,
           blockHeight: block.index,
           blockHash: block.hash,
-          confirmations: blockchain.chain.length - block.index
+          confirmations: getBlockchain().chain.length - block.index
         } as any;
       }
     }
@@ -346,13 +346,13 @@ export class RPCService {
       return {
         address: params.address,
         denom: params.denom,
-        amount: blockchain.getBalance(params.address, params.denom).toString()
+        amount: getBlockchain().getBalance(params.address, params.denom).toString()
       };
     }
 
     return {
       address: params.address,
-      balances: blockchain.getAllBalances(params.address)
+      balances: getBlockchain().getAllBalances(params.address)
     };
   }
 
@@ -363,7 +363,7 @@ export class RPCService {
       throw error;
     }
 
-    const balances = blockchain.getAllBalances(params.address);
+    const balances = getBlockchain().getAllBalances(params.address);
     const cosmosAccount = await cosmosService.getAccount(params.address);
 
     return {
@@ -376,8 +376,8 @@ export class RPCService {
   }
 
   private getChainInfo(): any {
-    const stats = blockchain.getStats();
-    const latestBlock = blockchain.getLatestBlock();
+    const stats = getBlockchain().getStats();
+    const latestBlock = getBlockchain().getLatestBlock();
 
     return {
       chainId: 'cosmos-local-chain',
@@ -410,7 +410,7 @@ export class RPCService {
     const fee = parseFloat(params.fee || '0.001');
     const denom = params.denom || 'COSMOS';
 
-    const transaction = blockchain.createTransaction(
+    const transaction = getBlockchain().createTransaction(
       params.from,
       params.to,
       amount,
@@ -418,7 +418,7 @@ export class RPCService {
       fee
     );
 
-    const success = blockchain.addTransaction(transaction);
+    const success = getBlockchain().addTransaction(transaction);
     if (!success) {
       const error = new Error('交易被拒绝，可能是余额不足') as any;
       error.code = RPC_ERRORS.TRANSACTION_REJECTED;
@@ -436,7 +436,7 @@ export class RPCService {
   }
 
   private getPendingTransactions(): ITransaction[] {
-    return blockchain.transactionPool.getPendingTransactions();
+    return getBlockchain().transactionPool.getPendingTransactions();
   }
 
   private estimateGas(params: {
@@ -461,7 +461,7 @@ export class RPCService {
     }
 
     try {
-      return blockchain.mineBlock(params.minerAddress);
+      return getBlockchain().mineBlock(params.minerAddress);
     } catch (err: any) {
       const error = new Error(`挖矿失败: ${err.message}`) as any;
       error.code = RPC_ERRORS.MINING_ERROR;
@@ -472,10 +472,10 @@ export class RPCService {
   private getMiningInfo(): any {
     return {
       ...this.miningManager.getStatus(),
-      difficulty: blockchain.difficulty,
-      miningReward: blockchain.miningReward,
-      pendingTransactions: blockchain.transactionPool.getSize(),
-      latestBlockHeight: blockchain.chain.length - 1
+      difficulty: getBlockchain().difficulty,
+      miningReward: getBlockchain().miningReward,
+      pendingTransactions: getBlockchain().transactionPool.getSize(),
+      latestBlockHeight: getBlockchain().chain.length - 1
     };
   }
 
@@ -646,15 +646,15 @@ export class RPCService {
       connections: 1,
       syncStatus: {
         syncing: false,
-        latestBlockHeight: blockchain.chain.length - 1,
-        latestBlockTime: blockchain.getLatestBlock().timestamp
+        latestBlockHeight: getBlockchain().chain.length - 1,
+        latestBlockTime: getBlockchain().getLatestBlock().timestamp
       }
     };
   }
 
   private reset(): { message: string } {
     try {
-      blockchain.reset();
+      getBlockchain().reset();
       this.miningManager.stop();
       return { message: '区块链已重置' };
     } catch (err: any) {
@@ -667,7 +667,7 @@ export class RPCService {
   private backup(): { message: string; timestamp: number } {
     try {
       const timestamp = Date.now();
-      const success = blockchain.saveToStorage();
+      const success = getBlockchain().saveToStorage();
       
       if (!success) {
         throw new Error('保存失败');
@@ -689,9 +689,9 @@ export class RPCService {
       let success = false;
 
       if (params.snapshotName) {
-        success = blockchain.restoreFromSnapshot(params.snapshotName);
+        success = getBlockchain().restoreFromSnapshot(params.snapshotName);
       } else {
-        success = blockchain.loadFromStorage();
+        success = getBlockchain().loadFromStorage();
       }
 
       if (!success) {

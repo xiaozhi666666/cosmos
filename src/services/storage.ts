@@ -10,7 +10,8 @@
  * 使用浏览器的 localStorage 进行数据持久化
  */
 
-import { Block, Transaction, Blockchain } from './blockchain';
+// 避免循环依赖，只使用类型导入
+import type { Block } from './blockchain';
 
 export interface StorageData {
   blocks: Block[];
@@ -33,7 +34,7 @@ export class BlockchainStorage {
   /**
    * 保存区块链数据到本地存储
    */
-  static save(blockchain: Blockchain): boolean {
+  static save(blockchain: any): boolean {
     try {
       const data: StorageData = {
         blocks: blockchain.chain,
@@ -92,29 +93,31 @@ export class BlockchainStorage {
   /**
    * 恢复区块链状态
    */
-  static restore(blockchain: Blockchain): boolean {
+  static restore(blockchain: any): boolean {
     const data = this.load();
     if (!data) {
       return false;
     }
 
     try {
-      // 重建区块链
-      blockchain.chain = data.blocks.map(blockData => {
+      // 重建区块链 - 使用动态导入避免循环依赖
+      blockchain.chain = data.blocks.map((blockData: any) => {
+        // 动态导入 Block 类
+        const { Block } = require('./blockchain');
         const block = new Block(
           blockData.index,
           blockData.data,
           blockData.previousHash,
           blockData.difficulty,
+          blockData.merkleRoot,
           blockData.miner,
           blockData.reward
         );
         
-        // 恢复区块的所有属性
+        // 恢复区块的其他属性
         block.timestamp = blockData.timestamp;
         block.hash = blockData.hash;
         block.nonce = blockData.nonce;
-        block.merkleRoot = blockData.merkleRoot;
         
         return block;
       });
@@ -210,13 +213,13 @@ export class BlockchainStorage {
   /**
    * 序列化余额数据
    */
-  private static serializeBalances(blockchain: Blockchain): { [address: string]: { [denom: string]: number } } {
+  private static serializeBalances(blockchain: any): { [address: string]: { [denom: string]: number } } {
     const balances: { [address: string]: { [denom: string]: number } } = {};
     
     // 遍历所有已知地址
     const addresses = new Set<string>();
-    blockchain.chain.forEach(block => {
-      block.data.forEach(tx => {
+    blockchain.chain.forEach((block: any) => {
+      block.data.forEach((tx: any) => {
         if (tx.from !== 'system') addresses.add(tx.from);
         addresses.add(tx.to);
       });
@@ -224,7 +227,7 @@ export class BlockchainStorage {
 
     // 获取每个地址的余额
     addresses.forEach(address => {
-      const addressBalances = blockchain.getAllBalances(address);
+      const addressBalances = blockchain.getAllBalances(address) as any[];
       if (addressBalances.length > 0) {
         balances[address] = {};
         addressBalances.forEach(balance => {
@@ -240,7 +243,7 @@ export class BlockchainStorage {
    * 反序列化余额数据
    */
   private static deserializeBalances(
-    blockchain: Blockchain, 
+    blockchain: any, 
     balances: { [address: string]: { [denom: string]: number } }
   ): void {
     // 使用反射来访问私有的 balances 属性
@@ -321,7 +324,7 @@ export class BlockchainStorage {
   /**
    * 自动保存功能
    */
-  static enableAutoSave(blockchain: Blockchain, interval: number = 60000): NodeJS.Timeout {
+  static enableAutoSave(blockchain: any, interval: number = 60000): NodeJS.Timeout {
     console.log(`已启用自动保存，间隔: ${interval / 1000}s`);
     
     return setInterval(() => {
@@ -368,7 +371,7 @@ export class SnapshotManager {
   /**
    * 创建区块链快照
    */
-  static createSnapshot(blockchain: Blockchain, name?: string): string {
+  static createSnapshot(blockchain: any, name?: string): string {
     const timestamp = Date.now();
     const snapshotName = name || `snapshot-${timestamp}`;
     const snapshotKey = this.SNAPSHOT_PREFIX + snapshotName;
@@ -398,7 +401,7 @@ export class SnapshotManager {
   /**
    * 恢复区块链快照
    */
-  static restoreSnapshot(blockchain: Blockchain, snapshotName: string): boolean {
+  static restoreSnapshot(blockchain: any, snapshotName: string): boolean {
     const snapshotKey = this.SNAPSHOT_PREFIX + snapshotName;
 
     try {

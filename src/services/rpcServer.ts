@@ -13,6 +13,7 @@
  */
 
 import { rpcService, RPCRequest, RPCResponse, RPCMethod } from './rpc';
+import { serializeRpcResponse, safeJsonStringify } from '../utils/json';
 
 // 服务器配置
 interface ServerConfig {
@@ -116,7 +117,7 @@ export class RPCServer {
         response = await this.handleSingleRequest(request);
       }
 
-      return JSON.stringify(response);
+      return serializeRpcResponse(response);
     } catch (error: any) {
       console.error('RPC请求处理失败:', error);
       
@@ -130,7 +131,7 @@ export class RPCServer {
         id: null
       };
 
-      return JSON.stringify(errorResponse);
+      return safeJsonStringify(errorResponse);
     } finally {
       // 记录请求日志
       if (this.config.logRequests && request && response) {
@@ -323,7 +324,7 @@ export class RPCServer {
             id: Date.now()
           };
 
-          const responseStr = await this.handleRequest(JSON.stringify(request));
+          const responseStr = await this.handleRequest(safeJsonStringify(request));
           const response: RPCResponse = JSON.parse(responseStr);
 
           if (response.error) {
@@ -410,7 +411,7 @@ export class RPCClient {
       id: index
     }));
 
-    const responseStr = await this.server.handleRequest(JSON.stringify(requests));
+    const responseStr = await this.server.handleRequest(safeJsonStringify(requests));
     const responses: RPCResponse[] = JSON.parse(responseStr);
 
     return responses.map(response => {

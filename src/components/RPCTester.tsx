@@ -32,6 +32,7 @@ import {
   PlayArrow,
   Refresh
 } from '@mui/icons-material';
+import { formatForDisplay } from '../utils/json';
 import { rpcService } from '../services/rpc';
 import { rpcServer } from '../services/rpcServer';
 import { integrationService } from '../services/integration';
@@ -467,7 +468,7 @@ export default function RPCTester() {
                           fontSize: '0.875rem'
                         }}
                       >
-                        {JSON.stringify(result.result, null, 2)}
+                        {formatForDisplay(result.result, 2)}
                       </Box>
                     </Box>
                   ) : (

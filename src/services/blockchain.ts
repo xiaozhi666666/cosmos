@@ -3,6 +3,7 @@
  * 
  * 这个文件实现了一个完整的区块链系统，包括：
  * - 工作量证明（PoW）共识机制
+
  * - 完整的区块验证
  * - 交易池管理
  * - Merkle树结构
@@ -10,9 +11,20 @@
  * - 挖矿奖励系统
  */
 
-import { BlockchainStorage, SnapshotManager } from './storage';
 import { sha256Sync, MerkleTree, ProofOfWork } from '../utils/crypto';
 
+// 延迟导入避免循环依赖
+let BlockchainStorage: any = null;
+let SnapshotManager: any = null;
+
+function getStorageClasses() {
+  if (!BlockchainStorage) {
+    const storage = require('./storage');
+    BlockchainStorage = storage.BlockchainStorage;
+    SnapshotManager = storage.SnapshotManager;
+  }
+  return { BlockchainStorage, SnapshotManager };
+}
 // 区块接口
 export interface IBlock {
   index: number;                    // 区块索引
@@ -92,18 +104,19 @@ export class Block implements IBlock {
    * 计算区块哈希
    */
   calculateHash(): string {
-    const data = 
+    // 构建不包含nonce的基础数据
+    const baseData = 
       this.index.toString() +
       this.previousHash +
       this.timestamp.toString() +
       JSON.stringify(this.data) +
-      this.nonce.toString() +
       this.difficulty.toString() +
       this.merkleRoot +
       this.miner +
       this.reward.toString();
     
-    return sha256Sync(data);
+    // 添加nonce并计算哈希
+    return sha256Sync(baseData + this.nonce.toString());
   }
 
   /**
@@ -120,24 +133,46 @@ export class Block implements IBlock {
   mineBlock(difficulty: number): void {
     const target = Array(difficulty + 1).join('0');
     
-    console.log(`开始挖矿区块 #${this.index}...`);
+    console.log(`开始挖矿区块 #${this.index}，难度: ${difficulty}...`);
     const startTime = Date.now();
 
     while (this.hash.substring(0, difficulty) !== target) {
       this.nonce++;
       this.hash = this.calculateHash();
       
-      // 每10万次显示进度
-      if (this.nonce % 100000 === 0) {
+      // 每10万次显示进度，或者在低难度下每1万次显示
+      const progressInterval = difficulty <= 2 ? 10000 : 100000;
+      if (this.nonce % progressInterval === 0) {
         console.log(`尝试次数: ${this.nonce}, 当前哈希: ${this.hash.substring(0, 20)}...`);
       }
     }
 
     const endTime = Date.now();
-    console.log(`区块 #${this.index} 挖矿完成!`);
+    console.log(`✅ 区块 #${this.index} 挖矿完成!`);
     console.log(`哈希: ${this.hash}`);
     console.log(`Nonce: ${this.nonce}`);
     console.log(`用时: ${endTime - startTime}ms`);
+    
+    // 验证挖出的区块 - 使用相同的基础数据格式
+    const baseData = 
+      this.index.toString() + 
+      this.previousHash + 
+      this.timestamp.toString() + 
+      JSON.stringify(this.data) + 
+      this.difficulty.toString() + 
+      this.merkleRoot + 
+      this.miner + 
+      this.reward.toString();
+      
+    const isValidPow = ProofOfWork.verify(baseData, this.nonce, this.difficulty);
+    
+    if (!isValidPow) {
+      console.error('❌ 挖矿完成但工作量证明验证失败!');
+      console.error(`基础数据: ${baseData}`);
+      console.error(`Nonce: ${this.nonce}, 难度: ${this.difficulty}`);
+    } else {
+      console.log('✅ 工作量证明验证通过');
+    }
   }
 
   /**
@@ -156,14 +191,26 @@ export class Block implements IBlock {
       return false;
     }
 
-    // 验证工作量证明
-    if (!ProofOfWork.verify(
-      this.index.toString() + this.previousHash + this.timestamp + JSON.stringify(this.data) + 
-      this.difficulty + this.merkleRoot + this.miner + this.reward,
-      this.nonce,
-      this.difficulty
-    )) {
+    // 验证工作量证明 - 使用与挖矿时相同的数据格式
+    const baseData = 
+      this.index.toString() + 
+      this.previousHash + 
+      this.timestamp.toString() + 
+      JSON.stringify(this.data) + 
+      this.difficulty.toString() + 
+      this.merkleRoot + 
+      this.miner + 
+      this.reward.toString();
+      
+    if (!ProofOfWork.verify(baseData, this.nonce, this.difficulty)) {
       console.log('无效的工作量证明');
+      console.log(`验证基础数据: ${baseData}`);
+      console.log(`Nonce: ${this.nonce}, 难度: ${this.difficulty}`);
+      console.log(`预期哈希应以: ${'0'.repeat(this.difficulty)} 开头`);
+      
+      // 验证实际计算的哈希
+      const actualHash = sha256Sync(baseData + this.nonce.toString());
+      console.log(`实际计算哈希: ${actualHash}`);
       return false;
     }
 
@@ -348,18 +395,14 @@ export class Blockchain {
 
   constructor() {
     this.chain = [this.createGenesisBlock()];
-    this.difficulty = 4;
+    this.difficulty = 1; // 降低初始难度到1
     this.miningReward = 50;
     this.transactionPool = new TransactionPool();
     
-    // 尝试从本地存储恢复数据
-    if (!this.loadFromStorage()) {
-      // 如果没有存储数据，初始化创世账户余额
-      this.initializeGenesisBalances();
-    }
-    
-    // 启用自动保存
-    this.enableAutoSave();
+    // 延迟初始化存储相关功能
+    setTimeout(() => {
+      this.initializeStorage();
+    }, 0);
   }
 
   /**
@@ -452,8 +495,11 @@ export class Blockchain {
     // 挖矿
     newBlock.mineBlock(adjustedDifficulty);
 
-    // 验证区块
-    if (newBlock.isValid(this.getLatestBlock())) {
+    // 验证区块 - 添加详细调试信息
+    console.log(`🔍 正在验证新挖出的区块 #${newBlock.index}...`);
+    const isValidBlock = newBlock.isValid(this.getLatestBlock());
+    
+    if (isValidBlock) {
       this.chain.push(newBlock);
       
       // 更新余额
@@ -463,10 +509,39 @@ export class Blockchain {
       const txIds = transactions.map(tx => tx.id);
       this.transactionPool.removeTransactions(txIds);
       
-      console.log(`新区块已添加到链中: #${newBlock.index}`);
+      console.log(`✅ 新区块已添加到链中: #${newBlock.index}`);
+      console.log(`💰 矿工 ${minerAddress} 获得奖励: ${this.miningReward} COSMOS`);
+      console.log(`📦 包含交易数: ${transactions.length}`);
       return newBlock;
     } else {
+      console.error(`❌ 区块验证失败！`);
+      console.error(`区块索引: ${newBlock.index}`);
+      console.error(`区块哈希: ${newBlock.hash}`);
+      console.error(`前块哈希: ${newBlock.previousHash}`);
+      console.error(`难度: ${newBlock.difficulty}`);
+      console.error(`Nonce: ${newBlock.nonce}`);
+      console.error(`矿工: ${newBlock.miner}`);
+      console.error(`奖励: ${newBlock.reward}`);
       throw new Error('挖出的区块无效');
+    }
+  }
+
+  /**
+   * 初始化存储功能
+   */
+  private initializeStorage(): void {
+    try {
+      // 尝试从本地存储恢复数据
+      if (!this.loadFromStorage()) {
+        // 如果没有存储数据，初始化创世账户余额
+        this.initializeGenesisBalances();
+      }
+      
+      // 启用自动保存
+      this.enableAutoSave();
+    } catch (error) {
+      console.warn('存储初始化失败，使用默认配置:', error);
+      this.initializeGenesisBalances();
     }
   }
 
@@ -474,28 +549,31 @@ export class Blockchain {
    * 动态调整难度
    */
   private adjustDifficulty(): number {
-    const targetBlockTime = 10000; // 10秒
-    const adjustmentInterval = 10; // 每10个区块调整一次
+    // 简化难度调整，保持较低难度
+    const targetBlockTime = 30000; // 30秒
+    const adjustmentInterval = 5; // 每5个区块调整一次
 
     if (this.chain.length % adjustmentInterval !== 0) {
-      return this.difficulty;
+      return Math.max(1, this.difficulty); // 最低难度为1
     }
 
     if (this.chain.length < adjustmentInterval) {
-      return this.difficulty;
+      return Math.max(1, this.difficulty);
     }
 
     const recentBlocks = this.chain.slice(-adjustmentInterval);
     const actualTime = recentBlocks[recentBlocks.length - 1].timestamp - recentBlocks[0].timestamp;
     const expectedTime = targetBlockTime * (adjustmentInterval - 1);
 
-    if (actualTime < expectedTime / 2) {
-      this.difficulty++;
-    } else if (actualTime > expectedTime * 2) {
+    if (actualTime < expectedTime / 3) {
+      this.difficulty = Math.min(3, this.difficulty + 1); // 最高难度为3
+      console.log(`🔼 难度增加到: ${this.difficulty}`);
+    } else if (actualTime > expectedTime * 3) {
       this.difficulty = Math.max(1, this.difficulty - 1);
+      console.log(`🔽 难度降低到: ${this.difficulty}`);
     }
 
-    console.log(`难度调整: ${this.difficulty}`);
+    console.log(`⚙️ 当前挖矿难度: ${this.difficulty}, 平均出块时间: ${(actualTime / adjustmentInterval / 1000).toFixed(1)}秒`);
     return this.difficulty;
   }
 
@@ -600,14 +678,14 @@ export class Blockchain {
    */
   loadFromStorage(): boolean {
     try {
+      const { BlockchainStorage } = getStorageClasses();
       const success = BlockchainStorage.restore(this);
       if (success) {
-        console.log('区块链数据已从本地存储恢复');
-        return true;
+        console.log('区块链数据已从存储恢复');
       }
-      return false;
+      return success;
     } catch (error) {
-      console.error('从存储加载失败:', error);
+      console.warn('从存储恢复失败:', error);
       return false;
     }
   }
@@ -617,6 +695,7 @@ export class Blockchain {
    */
   saveToStorage(): boolean {
     try {
+      const { BlockchainStorage } = getStorageClasses();
       return BlockchainStorage.save(this);
     } catch (error) {
       console.error('保存到存储失败:', error);
@@ -628,28 +707,51 @@ export class Blockchain {
    * 启用自动保存
    */
   private enableAutoSave(): void {
-    BlockchainStorage.enableAutoSave(this, 30000); // 每30秒自动保存
+    try {
+      const { BlockchainStorage } = getStorageClasses();
+      BlockchainStorage.enableAutoSave(this, 30000); // 每30秒自动保存
+    } catch (error) {
+      console.warn('启用自动保存失败:', error);
+    }
   }
 
   /**
    * 创建区块链快照
    */
   createSnapshot(name?: string): string {
-    return SnapshotManager.createSnapshot(this, name);
+    try {
+      const { SnapshotManager } = getStorageClasses();
+      return SnapshotManager.createSnapshot(this, name);
+    } catch (error) {
+      console.error('创建快照失败:', error);
+      return '';
+    }
   }
 
   /**
    * 从快照恢复
    */
   restoreFromSnapshot(snapshotName: string): boolean {
-    return SnapshotManager.restoreSnapshot(this, snapshotName);
+    try {
+      const { SnapshotManager } = getStorageClasses();
+      return SnapshotManager.restoreSnapshot(this, snapshotName);
+    } catch (error) {
+      console.error('恢复快照失败:', error);
+      return false;
+    }
   }
 
   /**
    * 列出所有快照
    */
   listSnapshots(): { name: string; timestamp: number; size: string }[] {
-    return SnapshotManager.listSnapshots();
+    try {
+      const { SnapshotManager } = getStorageClasses();
+      return SnapshotManager.listSnapshots();
+    } catch (error) {
+      console.error('列出快照失败:', error);
+      return [];
+    }
   }
 
   /**
@@ -667,11 +769,26 @@ export class Blockchain {
     this.initializeGenesisBalances();
     
     // 清除存储
-    BlockchainStorage.clear();
+    try {
+      const { BlockchainStorage } = getStorageClasses();
+      BlockchainStorage.clear();
+    } catch (error) {
+      console.warn('清除存储失败:', error);
+    }
     
     console.log('区块链已重置');
   }
 }
 
-// 导出单例实例
-export const blockchain = new Blockchain();
+// 延迟初始化的区块链实例
+let _blockchain: Blockchain | null = null;
+
+export function getBlockchain(): Blockchain {
+  if (!_blockchain) {
+    _blockchain = new Blockchain();
+  }
+  return _blockchain;
+}
+
+// 向后兼容的导出
+export const blockchain = getBlockchain();
